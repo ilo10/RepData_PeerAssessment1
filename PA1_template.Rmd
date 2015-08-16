@@ -8,18 +8,114 @@ output:
 
 ## Loading and preprocessing the data
 
+ *1. Load the data (i.e. read.csv())*
+```{r, echo=TRUE}
+activity<-read.csv("activity.csv")
+```
+
+  *2. Process/transform the data (if necessary) into a format suitable for your analysis*
+```{r, echo=TRUE}
+complet_case<-complete.cases(activity)
+comp_activity<-activity[complet_case==TRUE,]
+```
 
 
 ## What is mean total number of steps taken per day?
 
+  *1. Calculate the total number of steps taken per day*
+```{r, echo=TRUE}
+daily_steps<-split(comp_activity$steps,comp_activity$date)
+daily_tot_steps<-sapply(daily_steps,sum)# getting the daily total number of steps
+daily_tot_steps
+```
+
+  *2. Make a histogram of the total number of steps taken each day*
+```{r, echo=TRUE}
+hist(daily_tot_steps, main="Total Steps per Day", xlab="Steps") #Drawing the histogram and adding mean line and median line
+abline(v=mean(daily_tot_steps), lty=2, col="red")               
+abline(v=median(daily_tot_steps), lty=4, col="green")
+```
+
+  *3. Calculate and report the mean and median of the total number of steps taken per day*
+```{r, echo=TRUE}
+summary(daily_tot_steps) #gives the mean and the median
+```
 
 
 ## What is the average daily activity pattern?
 
+  *1. Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)*
+```{r, echo=TRUE}
+mean_steps_per_interval<-sapply(split(comp_activity$steps,comp_activity$interval),mean) #Getting the meean step per interval after ignoring nas
+plot(mean_steps_per_interval,main="Mean Steps per Interval", xlab="Intervals")
+abline(v=which.max(mean_steps_per_interval), lty=2, col="red")# Showing the maximum  
+```
 
+  *2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?*
+```{r, echo=TRUE}
+
+maximum<-which.max(mean_steps_per_interval)#retrieving its index
+interval_max<-names(maximum)
+interval_max #giving the interval with the max mean
+mean_steps_per_interval[interval_max] #maximum value
+```
 
 ## Imputing missing values
 
+  *1.Calculate and report the total number of missing values in the dataset*
+```{r, echo=TRUE}
+nas<-which(is.na(activity$steps)==TRUE)#Getting indexes where value equal na
+length(nas) #number of nas
+```
 
+  *2. Devise a strategy for filling in all of the missing values in the dataset*
+```{r, echo=TRUE}
+#Splitting the sreps per interval
+list_steps_per_interval<-split(activity$steps,activity$interval)
+#Replacing each na step value by the mean of it's belonging iterval
+rep_nas_mean<- lapply(list_steps_per_interval, function(x) { 
+  x[is.na(x)] <- mean(x, na.rm = TRUE)
+  x
+})
+```
+
+  *3. Create a new dataset that is equal to the original dataset but with the missing data filled in.*
+```{r, echo=TRUE}
+order_activity_per_interval<-activity[order(activity$interval,decreasing=FALSE),] # Ordering the initial dataset per interval
+complete_dataset<-cbind("steps"=unlist(rep_nas_mean),order_activity_per_interval[,2:3]) # Appending the list of replaced steps_value to the two other columns of the initial dataset with no nas and ordered by interval
+```
+
+  *4. Make a histogram of the total number of steps taken each day*
+```{r, echo=TRUE}
+new_daily_tot_steps<-sapply(split(complete_dataset$steps,complete_dataset$date), sum)# getting the daily total number of steps with the new dataset
+hist(new_daily_tot_steps, main="Total Steps per Day", xlab="Steps") #Drawing the histogram and adding mean line and median line
+abline(v=mean(new_daily_tot_steps), lty=2, col="red")               
+abline(v=median(new_daily_tot_steps), lty=4, col="green") 
+```
+
+  *Calculate and report the mean and median total number of steps taken per day*
+```{r, echo=TRUE}
+summary(new_daily_tot_steps)#Gives the mean and the median
+
+```
+Conclusion:   These values are a little bit different from the values we had in the first part of the assignement, because of the nas we had.
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+  *1.  Create a new factor variable in the dataset with two levels - "weekday" and "weekend" indicating whether a given date is a weekday or weekend day*
+  
+```{r, echo=TRUE}
+isWeekday<-lubridate::wday(complete_dataset$date) %in% c(1:5) #Telling whether a date is week day or not
+complete_dataset<-cbind(complete_dataset,"levels"=factor(isWeekday,labels=c("weekend","weekday"))) #dataset with factor levels : weekday and weekend
+
+```
+
+  *2Make a panel plot containing a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis).*
+```{r, echo=TRUE}
+agg_complete_dataset<-aggregate(complete_dataset$steps, by=list(complete_dataset$interval, complete_dataset$levels), mean)
+names(agg_complete_dataset)<-c("interval","levels","mean_steps") #adding header to the aggregate_variable
+require(lattice)
+xyplot(mean_steps ~ interval| levels, data = agg_complete_dataset, layout = c(1, 2),type='b') #Drawing the two Graphics
+```
+
+
